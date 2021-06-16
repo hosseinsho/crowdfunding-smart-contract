@@ -145,8 +145,7 @@ contract CrowdFunding is OwnerShip, Pausable{
 //       revert();
 //     }
 
-    /* The default fallback function is called whenever anyone sends funds to a contract */
-    function fund() public atStage(Status.Fundraising) recieveMaxAmount payable {
+    function fund() public atStage(Status.Fundraising) recieveMaxAmount whenNotPaused payable {
         contributions.push(
             Contribution({
                 addr: msg.sender,
@@ -156,34 +155,33 @@ contract CrowdFunding is OwnerShip, Pausable{
         project.currentBalance += msg.value;
         emit LogFundingReceived(msg.sender, msg.value, project.currentBalance);
     }
-    // todo read
-    //checks if the goal or time limit has been reached and ends the campaign
-    // function checkGoalReached() payable public onlyProjectOwner afterDeadline  {
-    //     require(project.status != Status.Successful && project.status!=Status.Fail);
-    //     if (project.currentBalance > project.minimumToRaise){
-    //         payable(msg.sender).transfer(project.currentBalance);
-    //         project.status = Status.Successful;
-    //         emit LogProjectPaid(project.addr, project.currentBalance, project.status);
-    //     } else {
-    //         project.status = Status.Fail;
-    //         for (uint i = 0; i < contributions.length; ++i) {
-    //           uint amountToRefund = contributions[i].amount;
-    //           contributions[i].amount = 0;
-    //           if(!contributions[i].addr.send(contributions[i].amount)) {
-    //             contributions[i].amount = amountToRefund;
-    //             emit LogErr(contributions[i].addr, contributions[i].amount);
-    //             revert();
-    //           } else{
-    //             project.currentBalance -= amountToRefund;
-    //             project.currentBalance = project.currentBalance;
-    //             emit Refund(contributions[i].addr, contributions[i].amount);
-    //           }
-    //         }
-    //     }
-    //     project.completeAt = now;
-    // }
+    // todo fix this to refund 
+    // todo change list to mapping
+    function checkGoalReached() payable public onlyProjectOwner isOnlyOwner afterDeadline  {
+        require(project.status != Status.Successful && project.status!=Status.Fail);
+        if (project.currentBalance > project.minimumToRaise){
+            payable(msg.sender).transfer(project.currentBalance);
+            project.status = Status.Successful;
+            emit LogProjectPaid(project.addr, project.currentBalance, project.status);
+        } else {
+            project.status = Status.Fail;
+            for (uint i = 0; i < contributions.length; ++i) {
+              uint amountToRefund = contributions[i].amount;
+              contributions[i].amount = 0;
+              if(!payable(contributions[i].addr).send(contributions[i].amount)) {
+                contributions[i].amount = amountToRefund;
+                emit LogErr(contributions[i].addr, contributions[i].amount);
+                revert();
+              } else{
+                project.currentBalance -= amountToRefund;
+                emit Refund(contributions[i].addr, contributions[i].amount);
+              }
+            }
+        }
+        project.completeAt = block.timestamp;
+    }
     
-    function destroy() public isOnlyOwner atEndOfCampain {
-        emit Pause();
+    function destroy() public isOnlyOwner {
+        pause();
     }
 }
