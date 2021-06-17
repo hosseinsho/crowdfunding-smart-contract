@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.4;
 
 contract OwnerShip {
@@ -11,6 +12,11 @@ contract OwnerShip {
         _;
     }
 }
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+
 
 contract Pausable is OwnerShip {
   event Pause();
@@ -53,11 +59,17 @@ contract Pausable is OwnerShip {
 }
 
 
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
 contract CrowdFunding is OwnerShip, Pausable{
 
     Project public project;
     Contribution[] public contributions;
-   
+    mapping(address => uint) public contribution;
    
     enum Status {
         Fundraising,
@@ -126,26 +138,26 @@ contract CrowdFunding is OwnerShip, Pausable{
     }
 
     modifier afterDeadline() {
-        require( block.timestamp >= project.deadline);
+        require( block.timestamp >= project.deadline, "need to wait until the deadline come");
         _;
     }
 
     modifier atEndOfCampain() {
-        require(!((project.status == Status.Fail || project.status == Status.Successful) && project.completeAt + 24 hours <  block.timestamp));
+        require(!((project.status == Status.Fail || project.status == Status.Successful) && project.completeAt + 1 seconds <  block.timestamp));
         _;
     }
     modifier recieveMaxAmount(){
-        require(project.currentBalance <= project.maximumToRaise);
+        require(project.currentBalance <= project.maximumToRaise, "you pay more than maximum amount of project fund rising");
         _;
     }
-    
+    // 4,175,558,158,089,600 Wei now about 10 dollor
+    modifier moreThanLittle(){
+        require(msg.value  > 4175558158089600 * 1 wei, "not enough amount for funding");
+        _;
+    }
 
-
-//   function () public payable {
-//       revert();
-//     }
-
-    function fund() public atStage(Status.Fundraising) recieveMaxAmount whenNotPaused payable {
+    function fund() public atStage(Status.Fundraising) recieveMaxAmount whenNotPaused moreThanLittle payable {
+        contribution[msg.sender] += msg.value;
         contributions.push(
             Contribution({
                 addr: msg.sender,
@@ -155,25 +167,27 @@ contract CrowdFunding is OwnerShip, Pausable{
         project.currentBalance += msg.value;
         emit LogFundingReceived(msg.sender, msg.value, project.currentBalance);
     }
-    // todo fix this to refund 
-    // todo change list to mapping
-    function checkGoalReached() payable public onlyProjectOwner isOnlyOwner afterDeadline  {
-        require(project.status != Status.Successful && project.status!=Status.Fail);
+    // todo Contribution datatype
+    // todo owner and accessibilities
+    // add afterDeadline
+    function checkGoalReached() public onlyProjectOwner payable{
+        
         if (project.currentBalance > project.minimumToRaise){
-            payable(msg.sender).transfer(project.currentBalance);
+            payable(project.addr).transfer(project.currentBalance);
             project.status = Status.Successful;
             emit LogProjectPaid(project.addr, project.currentBalance, project.status);
-        } else {
+        }
+        else {
             project.status = Status.Fail;
+            // todo here
             for (uint i = 0; i < contributions.length; ++i) {
               uint amountToRefund = contributions[i].amount;
-              contributions[i].amount = 0;
               if(!payable(contributions[i].addr).send(contributions[i].amount)) {
                 contributions[i].amount = amountToRefund;
                 emit LogErr(contributions[i].addr, contributions[i].amount);
                 revert();
               } else{
-                project.currentBalance -= amountToRefund;
+                project.currentBalance -= contributions[i].amount;
                 emit Refund(contributions[i].addr, contributions[i].amount);
               }
             }
