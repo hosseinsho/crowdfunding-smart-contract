@@ -16,7 +16,10 @@ contract OwnerShip {
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-
+// todo gas controll 
+// todo force stop 
+// todo ownership
+// todo owner and accessibilities
 
 contract Pausable is OwnerShip {
   event Pause();
@@ -168,8 +171,8 @@ contract CrowdFunding is OwnerShip, Pausable{
         emit LogFundingReceived(msg.sender, msg.value, project.currentBalance);
     }
     // todo Contribution datatype
-    // todo owner and accessibilities
-    // add afterDeadline
+    
+    // todo add afterDeadline
     function checkGoalReached() public onlyProjectOwner payable{
         
         if (project.currentBalance > project.minimumToRaise){
@@ -179,7 +182,6 @@ contract CrowdFunding is OwnerShip, Pausable{
         }
         else {
             project.status = Status.Fail;
-            // todo here
             for (uint i = 0; i < contributions.length; ++i) {
               uint amountToRefund = contributions[i].amount;
               if(!payable(contributions[i].addr).send(contributions[i].amount)) {
@@ -196,6 +198,6 @@ contract CrowdFunding is OwnerShip, Pausable{
     }
     
     function destroy() public isOnlyOwner {
-        pause();
+        // pause();
     }
 }
